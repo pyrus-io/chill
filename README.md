@@ -6,6 +6,8 @@ Build your vapor api endpoint as structs. Automatically generate OpenAPISpec doc
 
 
 ## Conform to this protocol and the magic happens:
+
+The buildAndRun function has a default implementation, so you are mostly responsible for  `run(context:parameters:query:body:)` 
 ```swift
 public protocol APIRoutingEndpoint {
     
