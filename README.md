@@ -33,6 +33,8 @@ public protocol APIRoutingEndpoint {
 
 ### Example with Params and Query
 ```swift
+import APIRouting
+
 struct SearchByUsernameEndpoint: APIRoutingEndpoint {
     
     struct SearchParams: Decodable {
@@ -60,6 +62,7 @@ struct SearchByUsernameEndpoint: APIRoutingEndpoint {
 
 ### Example with body
 ```swift
+import APIRouting
 
 struct RegisterEndpoint: APIRoutingEndpoint {
     
@@ -87,6 +90,8 @@ struct RegisterEndpoint: APIRoutingEndpoint {
 ## Autogen documentation as you do your development by configuring routes like these:
 
 ```swift
+import SwaggerDocumentationGenerator
+import APIRouting
 
 app.get("api-docs", "json") { (request) -> JSONString in
     let filePath = #file
