@@ -136,3 +136,7 @@ app.get("api-docs") { (request) -> HTML in
 }
 
 ```
+
+### Get docs like this for free
+
+![Example](./example-docs.png)
