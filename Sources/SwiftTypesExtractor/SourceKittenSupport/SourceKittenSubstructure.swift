@@ -52,6 +52,8 @@ struct SourceKittenSubstructure: Codable {
         case dictionaryExpr = "source.lang.swift.expr.dictionary"
         case tupleExpr = "source.lang.swift.expr.tuple"
         
+        case commentMark = "source.lang.swift.syntaxtype.comment.mark"
+        
         var isType: Bool {
             switch self {
             case .structTypeDecl, .enumTypeDecl, .classTypeDecl, .protocolTypeDecl:

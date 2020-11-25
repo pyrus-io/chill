@@ -28,8 +28,12 @@ public struct DocumentationGenerator {
             pattern: "((Dictionary<)([a-zA-Z]+)(\\s*,)(\\s*)([a-zA-Z]+)(>))|((\\[)([a-zA-Z]+)(\\s*:)(\\s*)([a-zA-Z]+)(\\]))",
             options: []
         )
+        static var vaporPageRegex = try! NSRegularExpression(
+            pattern: "(Page<)([a-zA-Z]+)(>)",
+            options: []
+        )
         
-        static let ignoredReturnTypes = ["String", "Int"]
+        static let ignoredReturnTypes = ["String", "Int", "HTTPStatus"]
     }
     
     public static func generateOpenAPIJSONString(apiDirectoryUrl: URL) throws -> String {
@@ -111,10 +115,12 @@ public struct DocumentationGenerator {
                 let cleanReturnName = cleanReturnTypeName(returnTypeName)
                 let isArray = !Constants.arrayRegex.matches(in: cleanReturnName, options: [], range: NSRange(location: 0, length: cleanReturnName.utf16.count)).isEmpty
                 let isDictionary = !Constants.dictRegex.matches(in: cleanReturnName, options: [], range: NSRange(location: 0, length: cleanReturnName.utf16.count)).isEmpty
+                let isVaporPage = !Constants.vaporPageRegex.matches(in: cleanReturnName, options: [], range: NSRange(location: 0, length: cleanReturnName.utf16.count)).isEmpty
                 
                 if !Constants.ignoredReturnTypes.contains(cleanReturnName)
                     && !isDictionary
-                    && !isArray {
+                    && !isArray
+                    && !isVaporPage {
                     guard let returnType = extractor.types[cleanReturnName] else {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(cleanReturnName) but it is used in the return type of \(endpointType.name)")
                     }
@@ -126,7 +132,7 @@ public struct DocumentationGenerator {
                             ref: "#/components/schemas/\(cleanReturnName)")
                         )]
                     )
-                } else if isArray, let typeName = extractArrayType(from: cleanReturnName) {
+                } else if isArray, let typeName = extractType(from: cleanReturnName, regex: Constants.arrayRegex) {
                     guard let returnType = extractor.types[typeName] else {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(cleanReturnName) but it is used in an array of the return type for \(endpointType.name)")
                     }
@@ -143,6 +149,24 @@ public struct DocumentationGenerator {
                         )]
                     )
                 }
+                else if isVaporPage, let typeName = extractType(from: cleanReturnName, regex: Constants.vaporPageRegex) {
+                    guard let returnType = extractor.types[typeName] else {
+                        throw DocsError.missingCriticalEndpointInformation("Can't find information about \(cleanReturnName) but it is used in an vapor page of the return type for \(endpointType.name)")
+                    }
+                    let pageDef = createPageDefinition(pagedTypeName: typeName)
+                    let pageMetadataDef = createVaporPageMetadataDefinition()
+                    let itemDef = createDefinition(from: returnType)
+                    definitions[cleanReturnName] = pageDef
+                    definitions["VaporPageMetadata"] = pageMetadataDef
+                    definitions[typeName] = itemDef
+                    responses[200] = .init(
+                        description: "",
+                        content: ["application/json": .init(schema: .init(
+                            ref: "#/components/schemas/\(cleanReturnName)")
+                        )]
+                    )
+                }
+                
             }
             
             if responses[200] == nil {
@@ -204,16 +228,45 @@ public struct DocumentationGenerator {
         var properties: [String: Swagger.DefinitionProperties] = [:]
         var requiredProperties: [String] = []
         type.instanceProperties.values.forEach { (property) in
-            properties[property.name] = .init(type: cleanType(property.type), ref: nil, items: nil)
+            properties[property.name] = .init(
+                type: cleanType(property.type),
+                ref: nil,
+                items: nil
+            )
             if typeIsRequired(property.type) {
                 requiredProperties.append(property.name)
             }
         }
         return .init(description: nil, properties: properties, required: requiredProperties)
     }
+    
+    private static func createPageDefinition(pagedTypeName: String) -> Swagger.Definition {
+        return .init(
+            description: nil,
+            properties: [
+                "items": .init(
+                    type: "array",
+                    items: .init(ref: "#/components/schemas/\(pagedTypeName)")),
+                "metadata": .init(type: "object", ref: "#/components/schemas/VaporPageMetadata")
+            ],
+            required: ["items", "metadata"]
+        )
+    }
+    
+    private static func createVaporPageMetadataDefinition() -> Swagger.Definition {
+        return .init(
+            description: nil,
+            properties: [
+                "page": .init(type: "integer"),
+                "per": .init(type: "integer"),
+                "total": .init(type: "integer")
+            ],
+            required: ["page", "per", "total"]
+        )
+    }
 
-    private static func extractArrayType(from value: String) -> String? {
-        let matches = Constants.arrayRegex.matches(in: value, options: [], range: NSRange(location: 0, length: value.utf16.count))
+    private static func extractType(from value: String, regex: NSRegularExpression) -> String? {
+        let matches = regex.matches(in: value, options: [], range: NSRange(location: 0, length: value.utf16.count))
         return matches.flatMap { result in
             (0..<result.numberOfRanges).map {
                             result.range(at: $0).location != NSNotFound
