@@ -77,8 +77,12 @@ public struct DocumentationGenerator {
                         "application/json": .init(schema: .init(ref: "#/components/schemas/\(argument.type)")),
                     ], required: true)
                     
-                    let def = createDefinition(from: requestBodyType)
-                    definitions[argument.type] = def
+                    createDefinition(
+                        from: requestBodyType,
+                        insertingInto: &definitions,
+                        withName: argument.type,
+                        extractor: extractor
+                    )
                 case "parameters" where argument.type != "Void":
                     guard let queryTypeInfo = extractor.types[argument.type] else {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(argument.type) but it is used in the query of \(endpointType.name)")
@@ -124,8 +128,14 @@ public struct DocumentationGenerator {
                     guard let returnType = extractor.types[cleanReturnName] else {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(cleanReturnName) but it is used in the return type of \(endpointType.name)")
                     }
-                    let def = createDefinition(from: returnType)
-                    definitions[cleanReturnName] = def
+        
+                    createDefinition(
+                        from: returnType,
+                        insertingInto: &definitions,
+                        withName: cleanReturnName,
+                        extractor: extractor
+                    )
+                    
                     responses[200] = .init(
                         description: "",
                         content: ["application/json": .init(schema: .init(
@@ -136,8 +146,14 @@ public struct DocumentationGenerator {
                     guard let returnType = extractor.types[typeName] else {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(cleanReturnName) but it is used in an array of the return type for \(endpointType.name)")
                     }
-                    let def = createDefinition(from: returnType)
-                    definitions[typeName] = def
+
+                    createDefinition(
+                        from: returnType,
+                        insertingInto: &definitions,
+                        withName: typeName,
+                        extractor: extractor
+                    )
+                    
                     responses[200] = .init(
                         description: "",
                         content: ["application/json": .init(
@@ -153,12 +169,15 @@ public struct DocumentationGenerator {
                     guard let returnType = extractor.types[typeName] else {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(cleanReturnName) but it is used in an vapor page of the return type for \(endpointType.name)")
                     }
-                    let pageDef = createPageDefinition(pagedTypeName: typeName)
-                    let pageMetadataDef = createVaporPageMetadataDefinition()
-                    let itemDef = createDefinition(from: returnType)
-                    definitions[cleanReturnName] = pageDef
-                    definitions["VaporPageMetadata"] = pageMetadataDef
-                    definitions[typeName] = itemDef
+
+                    createPageDefinition(pagedTypeName: typeName, insertingInto: &definitions, withName: cleanReturnName)
+                    createDefinition(
+                        from: returnType,
+                        insertingInto: &definitions,
+                        withName: typeName,
+                        extractor: extractor
+                    )
+                    
                     responses[200] = .init(
                         description: "",
                         content: ["application/json": .init(schema: .init(
@@ -209,6 +228,7 @@ public struct DocumentationGenerator {
         case "String", "UUID": return "string"
         case "Bool": return "boolean"
         case "Int": return "integer"
+        case "Double": return "number"
         default:
             return trimmed
         }
@@ -217,6 +237,16 @@ public struct DocumentationGenerator {
     private static func typeIsRequired(_ type: String) -> Bool {
         return !type.contains("?")
     }
+    
+    private static func typeIsObject(_ type: String) -> Bool {
+        let trimmed = type.trimmingCharacters(in: .init(arrayLiteral: "?"))
+        switch trimmed {
+        case "String", "UUID", "Bool", "Int", "Double", "Date", "URL":
+            return false
+        default:
+            return true
+        }
+    }
 
     private static func cleanReturnTypeName(_ returnTypeName: String) -> String {
         return String(returnTypeName
@@ -224,24 +254,55 @@ public struct DocumentationGenerator {
                         .dropLast(Constants.returnTypeSuffix.count))
     }
 
-    private static func createDefinition(from type: TypeDescription) -> Swagger.Definition {
+    private static func createDefinition(
+        from type: TypeDescription,
+        insertingInto definitionsTable: inout [String: Swagger.Definition],
+        withName name: String,
+        extractor: SwiftTypesExtractor
+    ) {
+        
+        guard definitionsTable[name] == nil else {
+            print("Skipping insertion of \(name) because it already exists")
+            return
+        }
+        
         var properties: [String: Swagger.DefinitionProperties] = [:]
         var requiredProperties: [String] = []
         type.instanceProperties.values.forEach { (property) in
-            properties[property.name] = .init(
-                type: cleanType(property.type),
-                ref: nil,
-                items: nil
-            )
+            
+            if typeIsObject(property.type) {
+                if let typeDescription = extractor.types[property.type] {
+                    createDefinition(
+                        from: typeDescription,
+                        insertingInto: &definitionsTable,
+                        withName: property.type,
+                        extractor: extractor
+                    )
+                    properties[property.name] = .init(
+                        ref: "#/components/schemas/\(property.type)"
+                    )
+                }
+            } else {
+                properties[property.name] = .init(
+                    type: cleanType(property.type),
+                    ref: nil,
+                    items: nil
+                )
+            }
             if typeIsRequired(property.type) {
                 requiredProperties.append(property.name)
             }
         }
-        return .init(description: nil, properties: properties, required: requiredProperties)
+        let def = Swagger.Definition(description: nil, properties: properties, required: requiredProperties)
+        definitionsTable[name] = def
     }
     
-    private static func createPageDefinition(pagedTypeName: String) -> Swagger.Definition {
-        return .init(
+    private static func createPageDefinition(
+        pagedTypeName: String,
+        insertingInto definitionsTable: inout [String: Swagger.Definition],
+        withName name: String
+    ) {
+        let def = Swagger.Definition(
             description: nil,
             properties: [
                 "items": .init(
@@ -251,10 +312,15 @@ public struct DocumentationGenerator {
             ],
             required: ["items", "metadata"]
         )
+        definitionsTable[name] = def
+        
+        createVaporPageMetadataDefinition(insertingInto: &definitionsTable)
     }
     
-    private static func createVaporPageMetadataDefinition() -> Swagger.Definition {
-        return .init(
+    private static func createVaporPageMetadataDefinition(
+        insertingInto definitionsTable: inout [String: Swagger.Definition]
+    ) {
+        let def = Swagger.Definition(
             description: nil,
             properties: [
                 "page": .init(type: "integer"),
@@ -263,6 +329,7 @@ public struct DocumentationGenerator {
             ],
             required: ["page", "per", "total"]
         )
+        definitionsTable["VaporPageMetadata"] = def
     }
 
     private static func extractType(from value: String, regex: NSRegularExpression) -> String? {
