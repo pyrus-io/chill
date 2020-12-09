@@ -18,7 +18,7 @@ public enum APIRoutingHTTPMethod: String {
 }
 
 public protocol APIRoutingContext {
-    static func createFrom(request: Request) -> Self
+    static func createFrom(request: Request) throws -> Self
 }
 
 public protocol APIRoutingEndpoint {

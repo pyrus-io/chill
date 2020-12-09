@@ -8,7 +8,7 @@
 import Foundation
 import SourceKittenFramework
 
-struct SourceKittenSubstructure: Codable {
+public struct SourceKittenSubstructure: Codable {
     
     struct InheritedType: Codable {
         var name: String
@@ -18,7 +18,9 @@ struct SourceKittenSubstructure: Codable {
         }
     }
     
-    enum Kind: String, Codable {
+    public enum Kind: String, Codable {
+        
+        case globalVarDecl = "source.lang.swift.decl.var.global"
         case localVarDecl = "source.lang.swift.decl.var.local"
         case instanceVarDecl = "source.lang.swift.decl.var.instance"
         case staticVarDecl = "source.lang.swift.decl.var.static"

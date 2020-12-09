@@ -36,8 +36,8 @@ public struct DocumentationGenerator {
         static let ignoredReturnTypes = ["String", "Int", "HTTPStatus"]
     }
     
-    public static func generateOpenAPIJSONString(apiDirectoryUrl: URL) throws -> String {
-        let extractor = try SwiftTypesExtractor(directoryUrl: apiDirectoryUrl)
+    public static func generateOpenAPIJSONString(readDirectoryUrls: [URL]) throws -> String {
+        let extractor = try SwiftTypesExtractor(directoryUrls: readDirectoryUrls)
         let endpointTypes = extractor.types(inheritingFrom: "APIRoutingContext")
 
         var document = Swagger.Document(
@@ -64,7 +64,9 @@ public struct DocumentationGenerator {
             var requestBody: Swagger.Body?
             var responses: [Int: Swagger.Body] = [:]
             
-            try executionFunc.arguments.forEach { argument in
+            try executionFunc.arguments.values
+                .sorted(by: { $0.order < $1.order })
+                .forEach { argument in
                 switch argument.name {
                 // TODO: determine how to use the context, could be useful info to include
                 case "context": break
@@ -87,13 +89,15 @@ public struct DocumentationGenerator {
                     guard let queryTypeInfo = extractor.types[argument.type] else {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(argument.type) but it is used in the query of \(endpointType.name)")
                     }
-                    queryTypeInfo.instanceProperties.values.forEach { property in
+                    queryTypeInfo.instanceProperties.values
+                        .sorted(by: { $0.order < $1.order })
+                        .forEach { property in
                         cleanedPath = cleanedPath.replacingOccurrences(of: ":\(property.name)", with: "{\(property.name)}")
                         parameters.append(Swagger.Parameter(
                             in: .path,
                             name: property.name,
                             required: typeIsRequired(property.type),
-                            schema: .init(type: Swagger.SchemaReference.ReferenceType(rawValue: cleanType(property.type)) ?? .object)
+                            schema: .init(type: Swagger.ReferenceType(rawValue: cleanType(property.type)) ?? .object)
                             )
                         )
                     }
@@ -101,14 +105,52 @@ public struct DocumentationGenerator {
                     guard let queryTypeInfo = extractor.types[argument.type] else {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(argument.type) but it is used in the query of \(endpointType.name)")
                     }
-                    queryTypeInfo.instanceProperties.values.forEach { property in
-                        parameters.append(Swagger.Parameter(
-                            in: .query,
-                            name: property.name,
-                            required: typeIsRequired(property.type),
-                            schema: .init(type: Swagger.SchemaReference.ReferenceType(rawValue: cleanType(property.type)) ?? .object)
+                    queryTypeInfo.instanceProperties.values
+                        .sorted(by: { $0.order < $1.order })
+                        .forEach { property in
+                        
+                        let cleanName: String = cleanType(property.type)
+                        let refType = Swagger.ReferenceType(rawValue: cleanName) ?? .object
+                        
+                        if refType != .object {
+                            parameters.append(Swagger.Parameter(
+                                in: .query,
+                                name: property.name,
+                                required: typeIsRequired(property.type),
+                                schema: .init(type: refType, format: cleanFormat(property.type))
+                                )
                             )
-                        )
+                        } else {
+                            var schema: Swagger.SchemaReference
+                            
+                            if typeIsArray(cleanName),
+                               let typeName = extractType(from: cleanName, regex: Constants.arrayRegex) {
+                                
+                                let cleanItemName = cleanType(typeName)
+                                let refType = Swagger.ReferenceType(rawValue: cleanItemName) ?? .object
+                                if refType != .object {
+                                    schema = .init(
+                                        type: .array,
+                                        items: .init(type: refType, format: cleanFormat(typeName)))
+                                } else {
+                                    createDefinition(from: cleanItemName, insertingInto: &definitions, extractor: extractor)
+                                    schema = .init(
+                                        type: .array,
+                                        items: .init(ref: "#/components/schemas/\(cleanItemName)"))
+                                }
+                            }
+                            else {
+                                createDefinition(from: cleanName, insertingInto: &definitions, extractor: extractor)
+                                schema = .init(ref: "#/components/schemas/\(cleanName)")
+                            }
+                            
+                            parameters.append(Swagger.Parameter(
+                                in: .query,
+                                name: property.name,
+                                required: typeIsRequired(property.type),
+                                schema: schema
+                            ))
+                        }
                     }
                 default: break
                 
@@ -169,8 +211,9 @@ public struct DocumentationGenerator {
                     guard let returnType = extractor.types[typeName] else {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(cleanReturnName) but it is used in an vapor page of the return type for \(endpointType.name)")
                     }
-
-                    createPageDefinition(pagedTypeName: typeName, insertingInto: &definitions, withName: cleanReturnName)
+                    
+                    let pageTypeName = "VaporPage__\(typeName)"
+                    createPageDefinition(pagedTypeName: typeName, insertingInto: &definitions, withName: pageTypeName)
                     createDefinition(
                         from: returnType,
                         insertingInto: &definitions,
@@ -181,7 +224,7 @@ public struct DocumentationGenerator {
                     responses[200] = .init(
                         description: "",
                         content: ["application/json": .init(schema: .init(
-                            ref: "#/components/schemas/\(cleanReturnName)")
+                            ref: "#/components/schemas/\(pageTypeName)")
                         )]
                     )
                 }
@@ -200,7 +243,7 @@ public struct DocumentationGenerator {
                 summary: endpointType.name,
                 parameters: parameters,
                 responses: responses,
-                tags: nil,
+                tags: cleanedPath.split(separator: "/").first.map { [String($0).capitalized] },
                 requestBody: requestBody)
         }
         document.components.schemas = definitions
@@ -225,7 +268,7 @@ public struct DocumentationGenerator {
     private static func cleanType(_ type: String) -> String {
         let trimmed = type.trimmingCharacters(in: .init(arrayLiteral: "?"))
         switch trimmed {
-        case "String", "UUID": return "string"
+        case "String", "UUID", "URL", "Date": return "string"
         case "Bool": return "boolean"
         case "Int": return "integer"
         case "Double": return "number"
@@ -233,12 +276,24 @@ public struct DocumentationGenerator {
             return trimmed
         }
     }
+    
+    private static func cleanFormat(_ type: String) -> String? {
+        let trimmed = type.trimmingCharacters(in: .init(arrayLiteral: "?"))
+        switch trimmed {
+        case "Date": return "iso8601"
+        case "UUID": return "uuid"
+        case "Double": return "double"
+        case "URL": return "uri"
+        default:
+            return nil
+        }
+    }
 
     private static func typeIsRequired(_ type: String) -> Bool {
         return !type.contains("?")
     }
     
-    private static func typeIsObject(_ type: String) -> Bool {
+    private static func typeIsNonPrimitive(_ type: String) -> Bool {
         let trimmed = type.trimmingCharacters(in: .init(arrayLiteral: "?"))
         switch trimmed {
         case "String", "UUID", "Bool", "Int", "Double", "Date", "URL":
@@ -247,11 +302,48 @@ public struct DocumentationGenerator {
             return true
         }
     }
+    
+    private static func typeIsArray(_ type: String) -> Bool {
+        !Constants.arrayRegex.matches(in: type, options: [], range: NSRange(location: 0, length: type.utf16.count)).isEmpty
+    }
+    
+    private static func typeIsEnum(_ type: String, extractor: SwiftTypesExtractor) -> Bool {
+        return extractor.types[type]?.kind == .enumTypeDecl
+    }
+    
+    private static func typeIsDict(_ type: String) -> Bool {
+        !Constants.dictRegex.matches(in: type, options: [], range: NSRange(location: 0, length: type.utf16.count)).isEmpty
+    }
+    
+    private static func typeIsVaporPage(_ type: String) -> Bool {
+        !Constants.vaporPageRegex.matches(in: type, options: [], range: NSRange(location: 0, length: type.utf16.count)).isEmpty
+    }
 
     private static func cleanReturnTypeName(_ returnTypeName: String) -> String {
         return String(returnTypeName
                         .dropFirst(Constants.returnTypePrefix.count)
                         .dropLast(Constants.returnTypeSuffix.count))
+    }
+    
+    private static func createDefinition(
+        from typeName: String,
+        insertingInto definitionsTable: inout [String: Swagger.Definition],
+        extractor: SwiftTypesExtractor
+    ) {
+        let cleanTypeName = typeName.trimmingCharacters(in: .init(arrayLiteral: "?"))
+        if typeIsArray(cleanTypeName) {
+            guard let typeName = extractType(from: cleanTypeName, regex: Constants.arrayRegex),
+                  let type = extractor.types[typeName] else {
+                return
+            }
+            createDefinition(from: type, insertingInto: &definitionsTable, withName: typeName, extractor: extractor)
+        }
+        else {
+            guard let type = extractor.types[cleanTypeName] else {
+                return
+            }
+            createDefinition(from: type, insertingInto: &definitionsTable, withName: cleanTypeName, extractor: extractor)
+        }
     }
 
     private static func createDefinition(
@@ -266,12 +358,38 @@ public struct DocumentationGenerator {
             return
         }
         
-        var properties: [String: Swagger.DefinitionProperties] = [:]
+        if type.kind == .enumTypeDecl {
+            createEnumDefinition(
+                from: type,
+                insertingInto: &definitionsTable,
+                withName: name,
+                extractor: extractor
+            )
+            return
+        }
+        
+        var properties: [String: Swagger.SchemaReference] = [:]
         var requiredProperties: [String] = []
-        type.instanceProperties.values.forEach { (property) in
+        type.instanceProperties.values
+            .sorted(by: { $0.order < $1.order })
+            .forEach { (property) in
             
-            if typeIsObject(property.type) {
-                if let typeDescription = extractor.types[property.type] {
+            if typeIsNonPrimitive(property.type) {
+                if typeIsArray(property.type),
+                   let typeName = extractType(from: property.type, regex: Constants.arrayRegex),
+                   let returnType = extractor.types[typeName] {
+                        createDefinition(
+                            from: returnType,
+                            insertingInto: &definitionsTable,
+                            withName: typeName,
+                            extractor: extractor
+                        )
+                    properties[property.name] = .init(
+                        items: Swagger.ItemReference(
+                        ref: "#/components/schemas/\(typeName)"
+                    ))
+                }
+                else if let typeDescription = extractor.types[property.type] {
                     createDefinition(
                         from: typeDescription,
                         insertingInto: &definitionsTable,
@@ -284,16 +402,45 @@ public struct DocumentationGenerator {
                 }
             } else {
                 properties[property.name] = .init(
-                    type: cleanType(property.type),
-                    ref: nil,
-                    items: nil
+                    type: Swagger.ReferenceType(rawValue: cleanType(property.type)) ?? .object,
+                    format: cleanFormat(property.type)
                 )
             }
             if typeIsRequired(property.type) {
                 requiredProperties.append(property.name)
             }
         }
-        let def = Swagger.Definition(description: nil, properties: properties, required: requiredProperties)
+        let def = Swagger.Definition(
+            description: nil,
+            properties: properties,
+            required: requiredProperties.isEmpty ? nil : requiredProperties
+        )
+        definitionsTable[name] = def
+    }
+    
+    private static func createEnumDefinition(
+        from type: TypeDescription,
+        insertingInto definitionsTable: inout [String: Swagger.Definition],
+        withName name: String,
+        extractor: SwiftTypesExtractor
+    ) {
+        guard definitionsTable[name] == nil else {
+            print("Skipping insertion of \(name) because it already exists")
+            return
+        }
+        
+        guard type.kind == .enumTypeDecl else {
+            return
+        }
+        
+        let def = Swagger.Definition(
+            type: "string",
+            enum: type
+                .cases
+                .values
+                .sorted(by: { $0.order < $1.order })
+                .map { $0.value }
+        )
         definitionsTable[name] = def
     }
     
@@ -306,9 +453,9 @@ public struct DocumentationGenerator {
             description: nil,
             properties: [
                 "items": .init(
-                    type: "array",
+                    type: .array,
                     items: .init(ref: "#/components/schemas/\(pagedTypeName)")),
-                "metadata": .init(type: "object", ref: "#/components/schemas/VaporPageMetadata")
+                "metadata": .init(type: .object, ref: "#/components/schemas/VaporPageMetadata")
             ],
             required: ["items", "metadata"]
         )
@@ -323,9 +470,9 @@ public struct DocumentationGenerator {
         let def = Swagger.Definition(
             description: nil,
             properties: [
-                "page": .init(type: "integer"),
-                "per": .init(type: "integer"),
-                "total": .init(type: "integer")
+                "page": .init(type: .integer),
+                "per": .init(type: .integer),
+                "total": .init(type: .integer)
             ],
             required: ["page", "per", "total"]
         )

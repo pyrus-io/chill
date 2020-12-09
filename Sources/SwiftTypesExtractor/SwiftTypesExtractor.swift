@@ -12,18 +12,24 @@ public struct SwiftTypesExtractor {
     
     public let types: [String: TypeDescription]
     
-    public init(directoryUrl: URL) throws {
-        let enumerator = FileManager.default.enumerator(atPath: directoryUrl.path)
-        var swiftFilePaths: [String] = []
-        while let element = enumerator?.nextObject() as? String {
-            if element.hasSuffix(".swift") {
-                swiftFilePaths.append(element)
+    public init(directoryUrls: [URL]) throws {
+        
+        var types: [String: TypeDescription] = [:]
+        
+        for directoryUrl in directoryUrls {
+            let enumerator = FileManager.default.enumerator(atPath: directoryUrl.path)
+            var swiftFilePaths: [String] = []
+            while let element = enumerator?.nextObject() as? String {
+                if element.hasSuffix(".swift") {
+                    swiftFilePaths.append(element)
+                }
             }
+            let files = swiftFilePaths.map {
+                File(pathDeferringReading: directoryUrl.appendingPathComponent($0).path)
+            }
+            types.merge(try SwiftTypesExtractor.extractTypes(from: files)) { $1 }
         }
-        let files = swiftFilePaths.map {
-            File(pathDeferringReading: directoryUrl.appendingPathComponent($0).path)
-        }
-        self.types = try SwiftTypesExtractor.extractTypes(from: files)
+        self.types = types
     }
     
     public func types(inheritingFrom: String) -> [String: TypeDescription] {

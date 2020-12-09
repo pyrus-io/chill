@@ -52,23 +52,28 @@ enum Swagger {
     typealias URLPathString = String
     typealias HTTPMethodString = String
     
+    enum ReferenceType: String, Codable {
+        case object
+        case array
+        case integer
+        case boolean
+        case string
+        case number
+    }
+    
     struct ItemReference: Codable {
+        var type: ReferenceType?
+        var format: String?
         var ref: String?
         
         enum CodingKeys: String, CodingKey {
+            case type
+            case format
             case ref = "$ref"
         }
     }
     
     struct SchemaReference: Codable {
-        enum ReferenceType: String, Codable {
-            case object
-            case array
-            case integer
-            case boolean
-            case string
-        }
-        
         var type: ReferenceType?
         var format: String?
         var ref: String?
@@ -118,18 +123,6 @@ enum Swagger {
         var schema: SchemaReference?
     }
     
-    struct DefinitionProperties: Codable {
-        var type: String?
-        var ref: String?
-        var items: SchemaReference?
-        
-        enum CodingKeys: String, CodingKey {
-            case type
-            case ref = "$ref"
-            case items
-        }
-    }
-    
     struct Server: Codable {
         var url: String
     }
@@ -141,8 +134,9 @@ enum Swagger {
     struct Definition: Codable {
         var type = "object"
         var description: String?
-        var properties: [String: DefinitionProperties]
-        var required: [String] // list of required properties
+        var `enum`: [String]?
+        var properties: [String: SchemaReference]?
+        var required: [String]? // list of required properties
     }
 
     struct Document: Codable {
