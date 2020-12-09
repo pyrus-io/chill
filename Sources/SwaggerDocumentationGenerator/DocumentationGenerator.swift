@@ -280,7 +280,7 @@ public struct DocumentationGenerator {
     private static func cleanFormat(_ type: String) -> String? {
         let trimmed = type.trimmingCharacters(in: .init(arrayLiteral: "?"))
         switch trimmed {
-        case "Date": return "iso8601"
+        case "Date": return "date-time"
         case "UUID": return "uuid"
         case "Double": return "double"
         case "URL": return "uri"
