@@ -1,0 +1,100 @@
+import Foundation
+
+public struct {{ endpoint.name }}: APIRequest {
+
+    public typealias DecodedResponse = {{ endpoint.responseType }}
+    
+    {% if endpoint.parameters.count > 0 %}
+    public struct Parameters {
+      {% for param in endpoint.parameters %}
+        public var {{ param.name }}: {{ param.type }}
+      {% endfor %}
+          public init(
+            {% for param in endpoint.parameters %}
+            {{ param.name }}: {{ param.type }}{% if forloop.last == false %},{% endif %}
+            {% endfor %}
+            ) {
+            {% for param in endpoint.parameters %}
+            self.{{ param.name }} = {{ param.name }}
+            {% endfor %}
+            }
+    }
+    {% endif %}
+    
+    {% if endpoint.query.count > 0 %}
+    public struct Query {
+      {% for prop in endpoint.query %}
+        public var {{ prop.name }}: {{ prop.type }}
+      {% endfor %}
+      public init(
+      {% for prop in endpoint.query %}
+      {{ prop.name }}: {{ prop.type }}{% if prop.required == false %} = nil{% endif %}{% if forloop.last == false %},{% endif %}
+      {% endfor %}
+      ) {
+      {% for prop in endpoint.query %}
+      self.{{ prop.name }} = {{ prop.name }}
+      {% endfor %}
+      }
+    }
+    {% endif %}
+    
+    public static let method: HTTPMethod = .{{ endpoint.method | lowercase }}
+    
+    public var endpoint: String {
+        {% if endpoint.query.count > 0 %}
+        var finalPath = "{{ endpoint.path }}"
+            var queryValues: [String] = []
+            {% for prop in endpoint.query %}
+                {% if prop.required %}
+                queryValues.append("{{ prop.name }}=\(query.{{ prop.name }})")
+                {% else %}
+                if let {{ prop.name }} = query.{{ prop.name }} {
+                    queryValues.append("{{ prop.name }}=\({{ prop.name }})")
+                }
+                {% endif %}
+            {% endfor %}
+            if queryValues.count > 0 {
+               finalPath = "?" + queryValues.joined(separator: "&")
+            }
+        return finalPath
+        {% else %}
+        "{{ endpoint.path }}"
+        {% endif %}
+    }
+    {% if requiresAuth %}
+    public var requiresAuth: Bool { true }
+    {% endif %}
+    
+    {% if endpoint.parameters.count > 0 %}
+    public var parameters: Parameters
+    {% endif %}
+    
+    {% if endpoint.query.count > 0 %}
+    public var query: Query
+    {% endif %}
+    
+    {% if endpoint.bodyType != nil %}
+    public var body: {{ endpoint.bodyType }}
+    {% endif %}
+    
+    public init(
+    {% if endpoint.parameters.count > 0 %}
+        parameters: Parameters
+        {% if endpoint.query.count > 0 %},{% elif endpoint.bodyType != nil %},{% endif %}
+    {% endif %}{% if endpoint.query.count > 0 %}
+        query: Query
+        {% if endpoint.bodyType != nil %},{% endif %}
+    {% endif %}{% if endpoint.bodyType != nil %}
+        body: {{ endpoint.bodyType }}
+    {% endif %}
+    ) {
+    {% if endpoint.parameters.count > 0 %}
+        self.parameters = parameters
+    {% endif %}{% if endpoint.query.count > 0 %}
+        self.query = query
+    {% endif %}{% if endpoint.bodyType != nil %}
+        self.body = body
+    {% endif %}
+    }
+    
+}

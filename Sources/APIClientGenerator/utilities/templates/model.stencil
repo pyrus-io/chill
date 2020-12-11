@@ -1,0 +1,16 @@
+import Foundation
+
+public struct {{ model.name }}: Codable {
+  {% for prop in model.properties %}
+    public var {{ prop.name }}: {{ prop.type }}
+  {% endfor %}
+      public init(
+        {% for prop in  model.properties %}
+        {{ prop.name }}: {{ prop.type }}{% if prop.required == false %} = nil{% endif %}{% if forloop.last == false %},{% endif %}
+        {% endfor %}
+        ) {
+        {% for prop in  model.properties %}
+        self.{{ prop.name }} = {{ prop.name }}
+        {% endfor %}
+        }
+}

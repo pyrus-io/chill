@@ -1,0 +1,7 @@
+import Foundation
+
+public enum {{ enum.name }}: String, Codable {
+  {% for case in enum.cases %}
+    case {{ case }}
+  {% endfor %}
+}

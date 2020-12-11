@@ -8,7 +8,8 @@ let package = Package(
     ],
     products: [
         .library(name: "SwaggerDocumentationGenerator", targets: ["SwaggerDocumentationGenerator"]),
-        .library(name: "APIRouting", targets: ["APIRouting"])
+        .library(name: "APIRouting", targets: ["APIRouting"]),
+        .executable(name: "CLI", targets: ["CLI"])
     ],
     dependencies: [
         // 💧 A server-side Swift web framework.
@@ -17,8 +18,15 @@ let package = Package(
         .package(url: "https://github.com/vapor/jwt.git", from: "4.0.0"),
         
         .package(url: "https://github.com/jpsim/SourceKitten.git", from: "0.3.0"),
+        
+        .package(url: "https://github.com/stencilproject/Stencil.git", from: "0.14.0"),
+        .package(url: "https://github.com/mxcl/PromiseKit.git", from: "6.13.2"),
+        .package(url: "https://github.com/nicklockwood/SwiftFormat.git", from: "0.47.7"),
+        
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "0.3.1"),
     ],
     targets: [
+        
         .target(
             name: "APIRouting",
             dependencies: [
@@ -43,9 +51,24 @@ let package = Package(
         ),
         
         .target(
-            name: "DocumentationGeneratorCLI",
+            name: "APIClientGenerator",
             dependencies: [
-                "SwaggerDocumentationGenerator"
+                .product(name: "Stencil", package: "Stencil"),
+                .product(name: "PromiseKit", package: "PromiseKit"),
+                .product(name: "SwiftFormat", package: "SwiftFormat"),
+
+                .target(name: "SwaggerDocumentationGenerator"),
+            ]
+        ),
+        
+        .target(
+            name: "CLI",
+            dependencies: [
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                
+                "APIClientGenerator",
+                "SwaggerDocumentationGenerator",
+                "SwiftTypesExtractor"
             ]
         ),
     ]
