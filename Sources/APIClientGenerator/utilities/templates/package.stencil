@@ -1,0 +1,21 @@
+// swift-tools-version:5.2
+import PackageDescription
+
+let package = Package(
+    name: "APIClient",
+    platforms: [],
+    products: [
+        .library(name: "APIClient", targets: ["APIClient"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/mxcl/PromiseKit.git", from: "6.13.2")
+    ],
+    targets: [
+        .target(
+            name: "APIClient",
+            dependencies: [
+                .product(name: "PromiseKit", package: "PromiseKit")
+            ]
+        ),
+    ]
+)

@@ -1,58 +1,11 @@
-//
-//  SwaggerStructures.swift
-//  
-//
-//  Created by Kyle Newsome on 2020-10-25.
-//
-
-/*
- 
- /users/search/{USERNAME}:
-     get:
-       tags:
-       - Users
-       summary: Search Username
-       description: test
-       operationId: SearchUsername
-       parameters:
-       - name: Authorization
-         in: header
-         schema:
-           type: string
-           default: Bearer {token}
-       - name: offset
-         in: query
-         required: true
-         schema:
-           type: integer
-           format: int32
-       - name: limit
-         in: query
-         required: true
-         schema:
-           type: integer
-           format: int32
-       - name: Content-Type
-         in: header
-         required: true
-         schema:
-           type: string
-       - name: USERNAME
-         in: path
-         required: true
-         schema:
-           type: string
- 
- */
-
 import Foundation
 
-enum Swagger {
+public enum Swagger {
     
-    typealias URLPathString = String
-    typealias HTTPMethodString = String
+    public typealias URLPathString = String
+    public typealias HTTPMethodString = String
     
-    enum ReferenceType: String, Codable {
+    public enum ReferenceType: String, Codable {
         case object
         case array
         case integer
@@ -61,25 +14,56 @@ enum Swagger {
         case number
     }
     
-    struct ItemReference: Codable {
-        var type: ReferenceType?
-        var format: String?
-        var ref: String?
+    public struct Document: Codable {
+        public struct Info: Codable {
+            public var title: String
+            public var version: String
+            public var description: String
+        }
         
-        enum CodingKeys: String, CodingKey {
+        public var openapi = "3.0.0"
+        public var info: Info
+        public var servers: [Server]
+        public var paths: [URLPathString: [HTTPMethodString: Method]]
+        public var components: Components
+    }
+    
+    public struct Server: Codable {
+        public var url: String
+    }
+    
+    public struct Components: Codable {
+        public var schemas: [String: Definition]
+        public var securitySchemes: [String: [String: String]]?
+    }
+
+    public struct Definition: Codable {
+        public var type = "object"
+        public var description: String?
+        public var `enum`: [String]?
+        public var properties: [String: SchemaReference]?
+        public var required: [String]? // list of required properties
+    }
+    
+    public struct ItemReference: Codable {
+        public var type: ReferenceType?
+        public var format: String?
+        public var ref: String?
+        
+        public enum CodingKeys: String, CodingKey {
             case type
             case format
             case ref = "$ref"
         }
     }
     
-    struct SchemaReference: Codable {
-        var type: ReferenceType?
-        var format: String?
-        var ref: String?
-        var items: ItemReference?
+    public struct SchemaReference: Codable {
+        public var type: ReferenceType?
+        public var format: String?
+        public var ref: String?
+        public var items: ItemReference?
         
-        enum CodingKeys: String, CodingKey {
+        public enum CodingKeys: String, CodingKey {
             case type
             case format
             case ref = "$ref"
@@ -87,95 +71,41 @@ enum Swagger {
         }
     }
     
-    struct BodyContentContainer: Codable {
-        var schema: SchemaReference
+    public struct BodyContentContainer: Codable {
+        public var schema: SchemaReference
     }
 
-    struct Path: Codable {
-        var method: Method
+    public struct Path: Codable {
+        public var method: Method
     }
     
-    struct Body: Codable {
-        var description: String?
-        var content: [String: BodyContentContainer]
-        var required: Bool?
+    public struct Body: Codable {
+        public var description: String?
+        public var content: [String: BodyContentContainer]
+        public var required: Bool?
     }
 
-    struct Method: Codable {
-        var operationId: String
-        var summary: String
-        var parameters: [Parameter]
-        var responses: [Int: Body]
-        var tags: [String]?
-        var requestBody: Body?
+    public struct Method: Codable {
+        public var operationId: String
+        public var summary: String
+        public var parameters: [Parameter]
+        public var responses: [Int: Body]
+        public var tags: [String]?
+        public var requestBody: Body?
+        public var security: Array<[String: [String]]>?
     }
 
-    struct Parameter: Codable {
-        enum Location: String, Codable {
+    public struct Parameter: Codable {
+        public enum Location: String, Codable {
             case header
             case query
             case path
         }
         
-        var `in`: Location
-        var name: String
-        var required: Bool?
-        var schema: SchemaReference?
+        public var `in`: Location
+        public var name: String
+        public var required: Bool?
+        public var schema: SchemaReference?
     }
     
-    struct Server: Codable {
-        var url: String
-    }
-    
-    struct Components: Codable {
-        var schemas: [String: Definition]
-    }
-
-    struct Definition: Codable {
-        var type = "object"
-        var description: String?
-        var `enum`: [String]?
-        var properties: [String: SchemaReference]?
-        var required: [String]? // list of required properties
-    }
-
-    struct Document: Codable {
-        struct Info: Codable {
-            var title: String
-            var version: String
-            var description: String
-        }
-        
-        var openapi = "3.0.0"
-        var info: Info
-        var servers: [Server]
-        var paths: [URLPathString: [HTTPMethodString: Method]]
-        var components: Components
-    }
 }
-
-
-//struct Property {
-//   var name: String
-//   var type: String
-//   var decorators: [String]
-//   var parameters: [String]
-//   var returnType: String
-//}
-//
-//struct Object {
-//   var name: String
-//   var properties: [Property]
-//   var decorators: [String]
-//}
-//
-//struct Path {
-//   var endpoint: String
-//   var method: String
-//   var requestBody: String
-//   var successBody: String
-//}
-//
-//struct ObjectDictionary {
-//    var name: Object
-//}

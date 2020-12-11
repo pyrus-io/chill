@@ -11,6 +11,19 @@ import SwiftTypesExtractor
 
 public struct DocumentationGenerator {
     
+    public struct Configuration {
+        public var securitySchemes: [String: [String: String]]?
+        public var authForContext: ((String) -> String?)?
+    
+        public init(
+            securitySchemes: [String: [String: String]]? = nil,
+            authForContext: ((String) -> String?)? = nil
+        ) {
+            self.securitySchemes = securitySchemes
+            self.authForContext = authForContext
+        }
+    }
+    
     enum DocsError: Error {
         case missingCriticalEndpointInformation(String)
         case failedToConvertToJSON
@@ -36,7 +49,24 @@ public struct DocumentationGenerator {
         static let ignoredReturnTypes = ["String", "Int", "HTTPStatus"]
     }
     
-    public static func generateOpenAPIJSONString(readDirectoryUrls: [URL]) throws -> String {
+    public static func generateOpenAPIJSONString(
+        readDirectoryUrls: [URL],
+        config: Configuration
+    ) throws -> String {
+        let document = try generateOpenAPIDocument(readDirectoryUrls: readDirectoryUrls, config: config)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        let jsonData = try JSONEncoder().encode(document)
+        guard let jsonString =  String(data: jsonData, encoding: .utf8) else {
+            throw DocsError.failedToConvertToJSON
+        }
+        return jsonString
+    }
+    
+    public static func generateOpenAPIDocument(
+        readDirectoryUrls: [URL],
+        config: Configuration
+    ) throws -> Swagger.Document {
         let extractor = try SwiftTypesExtractor(directoryUrls: readDirectoryUrls)
         let endpointTypes = extractor.types(inheritingFrom: "APIRoutingContext")
 
@@ -49,7 +79,7 @@ public struct DocumentationGenerator {
         var definitions: [String: Swagger.Definition] = [:]
         
         try endpointTypes.values.forEach { endpointType in
-            
+           
             guard let method = endpointType.staticProperties["method"]?.defaultValue,
                   let path = endpointType.staticProperties["path"]?.defaultValue else {
                 throw DocsError.missingCriticalEndpointInformation("method/path issue in \(endpointType.name). Expecting a static var with default value set")
@@ -63,13 +93,18 @@ public struct DocumentationGenerator {
             var parameters: [Swagger.Parameter] = []
             var requestBody: Swagger.Body?
             var responses: [Int: Swagger.Body] = [:]
+            var security: Array<[String: [String]]>?
             
             try executionFunc.arguments.values
                 .sorted(by: { $0.order < $1.order })
                 .forEach { argument in
                 switch argument.name {
-                // TODO: determine how to use the context, could be useful info to include
-                case "context": break
+                case "context":
+                    if let authName = config.authForContext?(argument.type) {
+                        security = [
+                            [authName: []]
+                        ]
+                    }
                 case "body" where argument.type != "Void":
                     guard let requestBodyType = extractor.types[argument.type] else {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(argument.type) but it is used in the query of \(endpointType.name)")
@@ -212,7 +247,7 @@ public struct DocumentationGenerator {
                         throw DocsError.missingCriticalEndpointInformation("Can't find information about \(cleanReturnName) but it is used in an vapor page of the return type for \(endpointType.name)")
                     }
                     
-                    let pageTypeName = "VaporPage__\(typeName)"
+                    let pageTypeName = "PageOf\(typeName)"
                     createPageDefinition(pagedTypeName: typeName, insertingInto: &definitions, withName: pageTypeName)
                     createDefinition(
                         from: returnType,
@@ -244,17 +279,14 @@ public struct DocumentationGenerator {
                 parameters: parameters,
                 responses: responses,
                 tags: cleanedPath.split(separator: "/").first.map { [String($0).capitalized] },
-                requestBody: requestBody)
+                requestBody: requestBody,
+                security: security)
         }
+        
+        document.components.securitySchemes = config.securitySchemes
         document.components.schemas = definitions
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-        let jsonData = try JSONEncoder().encode(document)
-        guard let jsonString =  String(data: jsonData, encoding: .utf8) else {
-            throw DocsError.failedToConvertToJSON
-        }
-        return jsonString
+        return document
     }
     
     private static func cleanPath(_ path: String) -> String {
@@ -354,7 +386,6 @@ public struct DocumentationGenerator {
     ) {
         
         guard definitionsTable[name] == nil else {
-            print("Skipping insertion of \(name) because it already exists")
             return
         }
         
@@ -455,7 +486,7 @@ public struct DocumentationGenerator {
                 "items": .init(
                     type: .array,
                     items: .init(ref: "#/components/schemas/\(pagedTypeName)")),
-                "metadata": .init(type: .object, ref: "#/components/schemas/VaporPageMetadata")
+                "metadata": .init(ref: "#/components/schemas/VaporPageMetadata")
             ],
             required: ["items", "metadata"]
         )

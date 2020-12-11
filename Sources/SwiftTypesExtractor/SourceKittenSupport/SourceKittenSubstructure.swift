@@ -24,8 +24,10 @@ public struct SourceKittenSubstructure: Codable {
         case localVarDecl = "source.lang.swift.decl.var.local"
         case instanceVarDecl = "source.lang.swift.decl.var.instance"
         case staticVarDecl = "source.lang.swift.decl.var.static"
+        case classVarDecl = "source.lang.swift.decl.var.class"
         case instanceMethodDecl = "source.lang.swift.decl.function.method.instance"
         case staticMethodDecl = "source.lang.swift.decl.function.method.static"
+        case classMethodDecl = "source.lang.swift.decl.function.method.class"
         
         case structTypeDecl = "source.lang.swift.decl.struct"
         case enumTypeDecl = "source.lang.swift.decl.enum"
@@ -36,6 +38,7 @@ public struct SourceKittenSubstructure: Codable {
         case freeFunctionDecl = "source.lang.swift.decl.function.free"
         case genericTypeParamDecl = "source.lang.swift.decl.generic_type_param"
         case typealiasDecl = "source.lang.swift.decl.typealias"
+        case subscriptDecl = "source.lang.swift.decl.function.subscript"
         case enumCaseDecl = "source.lang.swift.decl.enumcase"
         case parameterDecl = "source.lang.swift.decl.var.parameter"
         case enumElementDecl = "source.lang.swift.decl.enumelement"
@@ -46,6 +49,8 @@ public struct SourceKittenSubstructure: Codable {
         case switchStatement = "source.lang.swift.stmt.switch"
         case guardStatement = "source.lang.swift.stmt.guard"
         case foreachStatement = "source.lang.swift.stmt.foreach"
+        case whileStatement = "source.lang.swift.stmt.while"
+        case repeatwhileStatement = "source.lang.swift.stmt.repeatwhile"
         
         case argumentExpr = "source.lang.swift.expr.argument"
         case callExpr = "source.lang.swift.expr.call"
