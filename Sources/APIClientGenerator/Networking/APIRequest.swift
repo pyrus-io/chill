@@ -10,7 +10,6 @@ public enum HTTPMethod: String {
 
 public protocol AnyAPIRequest {
     static var method: HTTPMethod { get }
-    static var baseUrl: String { get }
     var endpoint: String { get }
 }
 
@@ -19,7 +18,7 @@ public protocol APIRequest: AnyAPIRequest {
     associatedtype DecodedResponse
     
     static var method: HTTPMethod { get }
-    static var baseUrl: String { get }
+    
     var endpoint: String { get }
     var requiresAuth: Bool { get }
     var additionalHeaders: [String: String] { get }
@@ -31,7 +30,7 @@ public protocol APIRequest: AnyAPIRequest {
 public extension APIRequest {
     
     var description: String {
-        return "\(Self.method.rawValue.uppercased()) \(Self.baseUrl)\(endpoint)"
+        return "\(Self.method.rawValue.uppercased()) \(endpoint)"
     }
 
     var requiresAuth: Bool { return false }

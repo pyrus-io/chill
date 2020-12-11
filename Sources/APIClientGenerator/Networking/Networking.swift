@@ -20,19 +20,21 @@ public struct NetworkingError: Swift.Error {
 
 public final class Networking {
     
-    public static var shared: Networking = Networking()
-    
     public private(set) var urlSession: URLSession
+    
+    public var baseURLStringProvider: (AnyAPIRequest) -> String
     public var authRefresh: () -> Promise<Void>
     public var authModifier: (inout URLRequest) -> Void
     public var badStatusCodeHandler: (Int) -> Void
     
     public init(
         urlSession: URLSession = .shared,
+        baseURLStringProvider: @escaping (AnyAPIRequest) -> String,
         authRefresh: @escaping () -> Promise<Void> = { .value(()) },
         authModifier: @escaping (inout URLRequest) -> Void = { _ in },
         badStatusCodeHandler: @escaping (Int) -> Void = { _ in }
     ) {
+        self.baseURLStringProvider = baseURLStringProvider
         self.urlSession = urlSession
         self.authRefresh = authRefresh
         self.authModifier = authModifier
@@ -114,7 +116,7 @@ extension Networking {
     
     private func buildUrlRequest<E: APIRequest>(_ request: E) throws -> URLRequest {
         
-        guard let url = URL(string: E.baseUrl + request.endpoint) else {
+        guard let url = URL(string: baseURLStringProvider(request) + request.endpoint) else {
             throw NetworkingError(type: .badUrl)
         }
         
