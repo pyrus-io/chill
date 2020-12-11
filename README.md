@@ -1,5 +1,5 @@
 # Chill 🍦
-More Convention, Less Code.
+More Convention, Less Coding
 
 Build your Vapor API endpoint as structs that conform to a protocol. Automatically gain:
 - Generate OpenAPI Documentation
