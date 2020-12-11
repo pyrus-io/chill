@@ -31,20 +31,31 @@ extension CLI {
         
         @Option(name: .shortAndLong, help: "Relative url to output file")
         var output: String = "./api.json"
+        
+        @Flag(name: .shortAndLong, help: "Output to console instead of saving")
+        var console: Bool = false
 
         mutating func run() {
             let inputDirectories: [URL] = inputs.map { Path($0).absolute().url }
-            let doc = try! DocumentationGenerator.generateOpenAPIDocument(
+            let doc = try! DocumentationGenerator.generateOpenAPIJSONString(
                 readDirectoryUrls: inputDirectories,
                 config: .init()
             )
-            print(String(data: (try! JSONEncoder().encode(doc)), encoding: .utf8)!)
+            if console {
+                print(doc)
+            } else {
+                FileManager.default.createFile(
+                    atPath: Path(output).absolute().url.path,
+                    contents: doc.data(using: .utf8),
+                    attributes: [:]
+                )
+            }
         }
     }
 
     struct APIClient: ParsableCommand {
         static var configuration =
-            CommandConfiguration(abstract: "Output OpenAPI documentation generator")
+            CommandConfiguration(abstract: "Generate a Swift API Client Module")
 
         @Option(name: .shortAndLong, help: "A list of relative urls to read")
         var inputs: [String] = ["./Sources"]
