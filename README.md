@@ -1,11 +1,25 @@
-# struct-vapor-endpoints
+# Chill 🍦
+More Convention, Less Code.
 
-Under heavy development. Also needs better name before it's official.
+Build your Vapor API endpoint as structs that conform to a protocol. Automatically gain:
+- Generate OpenAPI Documentation
+- Generate Swift API Client Code
+- Automatically decode the params/query/body before your core API logic begins
+- Test your endpoints as strongly typed units, rather than integrations with the HTTP protocol
 
-Build your vapor api endpoint as structs. Automatically generate OpenAPISpec documentation and spend less time decoding information from the params/query/body
+### Under heavy development. 
 
+## Using this library
+1. Install it as a swift package dependency of your Vapor API
+2. Follow the instructions below for designing your API
+3. Use the CLI to generate api documentation or api client
+	- check this repo out locally
+	- run `make install` from the directory
+	- run `chill --help` for more instructions
 
-## Conform to this protocol and the magic happens:
+## implementation
+
+### Conform to this protocol and the magic happens:
 
 The buildAndRun function has a default implementation, so you are mostly responsible for  `run(context:parameters:query:body:)` 
 ```swift
