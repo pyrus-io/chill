@@ -1,3 +1,7 @@
+//
+//  🍦 Chill friend, this code is generated
+//  🤔 Probably best not to touch it
+//
 import Foundation
 
 public struct {{ model.name }}: Codable {
