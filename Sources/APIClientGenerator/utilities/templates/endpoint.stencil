@@ -2,12 +2,21 @@ import Foundation
 
 public struct {{ endpoint.name }}: APIRequest {
 
-    {% if endpoint.bodyType != nil %}
-    public typealias BodyType = {{ endpoint.bodyType }}
-    {% else %}
-    public typealias BodyType = Void
+    {% if endpoint.parameters.count == 0 %}
+    public typealias Parameters = Void
     {% endif %}
-    public typealias ResponseType = {{ endpoint.responseType }}
+    
+    {% if endpoint.query.count == 0 %}
+    public typealias Query = Void
+    {% endif %}
+
+    {% if endpoint.bodyType != nil %}
+    public typealias Body = {{ endpoint.bodyType }}
+    {% else %}
+    public typealias Body = Void
+    {% endif %}
+    
+    public typealias ResponseBody = {{ endpoint.responseType }}
     
     {% if endpoint.parameters.count > 0 %}
     public struct Parameters {
@@ -72,10 +81,14 @@ public struct {{ endpoint.name }}: APIRequest {
     
     {% if endpoint.parameters.count > 0 %}
     public var parameters: Parameters
+    {% else %}
+    public var parameters: Parameters = ()
     {% endif %}
     
     {% if endpoint.query.count > 0 %}
     public var query: Query
+    {% else %}
+    public var query: Query = ()
     {% endif %}
     
     {% if endpoint.bodyType != nil %}

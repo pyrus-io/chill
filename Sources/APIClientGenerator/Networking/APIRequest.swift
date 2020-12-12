@@ -14,9 +14,11 @@ public protocol AnyAPIRequest {
 }
 
 public protocol APIRequest: AnyAPIRequest {
-
-    associatedtype BodyType
-    associatedtype ResponseType
+    
+    associatedtype Parameters
+    associatedtype Query
+    associatedtype Body
+    associatedtype ResponseBody
     
     static var method: HTTPMethod { get }
     static var requiresAuth: Bool { get }
@@ -24,7 +26,7 @@ public protocol APIRequest: AnyAPIRequest {
     var endpoint: String { get }
     var additionalHeaders: [String: String] { get }
     
-    var body: BodyType { get }
+    var body: Body { get }
     
     func getContentType() throws -> String?
     func getBody() throws -> Data?
@@ -44,7 +46,7 @@ public extension APIRequest {
     func getBody() throws -> Data? { nil }
 }
 
-public extension APIRequest where BodyType: Encodable {
+public extension APIRequest where Body: Encodable {
     
     func getContentType() -> String? { "application/json" }
     

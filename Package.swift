@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "struct-vapor-endpoints",
+    name: "chill",
     platforms: [
        .macOS(.v10_15)
     ],
@@ -14,8 +14,6 @@ let package = Package(
     dependencies: [
         // 💧 A server-side Swift web framework.
         .package(url: "https://github.com/vapor/vapor.git", from: "4.0.0"),
-        .package(url: "https://github.com/vapor/fluent.git", from: "4.0.0"),
-        .package(url: "https://github.com/vapor/jwt.git", from: "4.0.0"),
         
         .package(url: "https://github.com/jpsim/SourceKitten.git", from: "0.3.0"),
         
@@ -30,9 +28,7 @@ let package = Package(
         .target(
             name: "APIRouting",
             dependencies: [
-                .product(name: "Fluent", package: "fluent"),
-                .product(name: "Vapor", package: "vapor"),
-                .product(name: "JWT", package: "jwt")
+                .product(name: "Vapor", package: "vapor")
             ]
         ),
         

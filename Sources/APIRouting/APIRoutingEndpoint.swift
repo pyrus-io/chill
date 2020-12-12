@@ -1,13 +1,5 @@
-//
-//  APIEndpoint.swift
-//  
-//
-//  Created by Kyle Newsome on 2020-10-23.
-//
-
 import Foundation
 import Vapor
-import FluentKit
 
 public enum APIRoutingHTTPMethod: String {
     case get
@@ -27,18 +19,18 @@ public protocol APIRoutingEndpoint {
     associatedtype Parameters
     associatedtype Query
     associatedtype Body
-    associatedtype Response: ResponseEncodable
+    associatedtype ResponseBody: ResponseEncodable
     
     static var method: APIRoutingHTTPMethod { get }
     static var path: String { get }
     
-    static func buildAndRun(from request: Request) throws -> EventLoopFuture<Response>
+    static func buildAndRun(from request: Request) throws -> EventLoopFuture<ResponseBody>
     static func run(
         context: Context,
         parameters: Parameters,
         query: Query,
         body: Body
-    ) throws -> EventLoopFuture<Response>
+    ) throws -> EventLoopFuture<ResponseBody>
 }
 
 
@@ -64,7 +56,7 @@ public extension APIRoutingEndpoint {
 
 // All
 public extension APIRoutingEndpoint where Parameters: Decodable, Query: Decodable, Body: Decodable {
-    static func buildAndRun(from request: Request) throws -> EventLoopFuture<Response> {
+    static func buildAndRun(from request: Request) throws -> EventLoopFuture<ResponseBody> {
         let requestParameters = try request.parameters.decode(Parameters.self)
         let requestQuery = try request.query.decode(Query.self)
         let requestBody = try request.content.decode(Body.self)
@@ -79,7 +71,7 @@ public extension APIRoutingEndpoint where Parameters: Decodable, Query: Decodabl
 
 // None
 public extension APIRoutingEndpoint where Parameters == Void, Query == Void, Body == Void {
-    static func buildAndRun(from request: Request) throws -> EventLoopFuture<Response> {
+    static func buildAndRun(from request: Request) throws -> EventLoopFuture<ResponseBody> {
         return try self.run(
             context: Context.createFrom(request: request),
             parameters: (),
@@ -91,7 +83,7 @@ public extension APIRoutingEndpoint where Parameters == Void, Query == Void, Bod
 
 // Param alone
 public extension APIRoutingEndpoint where Parameters: Decodable, Query == Void, Body == Void {
-    static func buildAndRun(from request: Request) throws -> EventLoopFuture<Response> {
+    static func buildAndRun(from request: Request) throws -> EventLoopFuture<ResponseBody> {
         let requestParameters = try request.parameters.decode(Parameters.self)
         return try self.run(
             context: Context.createFrom(request: request),
@@ -104,7 +96,7 @@ public extension APIRoutingEndpoint where Parameters: Decodable, Query == Void, 
 
 // Params & Query
 public extension APIRoutingEndpoint where Parameters: Decodable, Query: Decodable, Body == Void {
-    static func buildAndRun(from request: Request) throws -> EventLoopFuture<Response> {
+    static func buildAndRun(from request: Request) throws -> EventLoopFuture<ResponseBody> {
         let requestParameters = try request.parameters.decode(Parameters.self)
         let requestQuery = try request.query.decode(Query.self)
         return try self.run(
@@ -118,7 +110,7 @@ public extension APIRoutingEndpoint where Parameters: Decodable, Query: Decodabl
 
 // Param & Body
 public extension APIRoutingEndpoint where Parameters: Decodable, Query == Void, Body: Decodable {
-    static func buildAndRun(from request: Request) throws -> EventLoopFuture<Response> {
+    static func buildAndRun(from request: Request) throws -> EventLoopFuture<ResponseBody> {
         let requestParameters = try request.parameters.decode(Parameters.self)
         let requestBody = try request.content.decode(Body.self)
         return try self.run(
@@ -132,7 +124,7 @@ public extension APIRoutingEndpoint where Parameters: Decodable, Query == Void, 
 
 // Query only
 public extension APIRoutingEndpoint where Parameters == Void, Query: Decodable, Body == Void {
-    static func buildAndRun(from request: Request) throws -> EventLoopFuture<Response> {
+    static func buildAndRun(from request: Request) throws -> EventLoopFuture<ResponseBody> {
         let requestQuery = try request.query.decode(Query.self)
         return try self.run(
             context: Context.createFrom(request: request),
@@ -145,7 +137,7 @@ public extension APIRoutingEndpoint where Parameters == Void, Query: Decodable, 
 
 // Query & Body
 public extension APIRoutingEndpoint where Parameters == Void, Query: Decodable, Body: Decodable {
-    static func buildAndRun(from request: Request) throws -> EventLoopFuture<Response> {
+    static func buildAndRun(from request: Request) throws -> EventLoopFuture<ResponseBody> {
         let requestQuery = try request.query.decode(Query.self)
         let requestBody = try request.content.decode(Body.self)
         return try self.run(
@@ -159,7 +151,7 @@ public extension APIRoutingEndpoint where Parameters == Void, Query: Decodable, 
 
 // Body alone
 public extension APIRoutingEndpoint where Parameters == Void, Query == Void, Body: Decodable {
-    static func buildAndRun(from request: Request) throws -> EventLoopFuture<Response> {
+    static func buildAndRun(from request: Request) throws -> EventLoopFuture<ResponseBody> {
         let requestBody = try request.content.decode(Body.self)
         return try self.run(
             context: Context.createFrom(request: request),

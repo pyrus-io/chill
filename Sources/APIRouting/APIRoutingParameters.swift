@@ -1,10 +1,3 @@
-//
-//  APIRoutingParameters.swift
-//  
-//
-//  Created by Kyle Newsome on 2020-10-28.
-//
-
 import Foundation
 import Vapor
 
