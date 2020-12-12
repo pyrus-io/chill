@@ -2,7 +2,12 @@ import Foundation
 
 public struct {{ endpoint.name }}: APIRequest {
 
-    public typealias DecodedResponse = {{ endpoint.responseType }}
+    {% if endpoint.bodyType != nil %}
+    public typealias BodyType = {{ endpoint.bodyType }}
+    {% else %}
+    public typealias BodyType = Void
+    {% endif %}
+    public typealias ResponseType = {{ endpoint.responseType }}
     
     {% if endpoint.parameters.count > 0 %}
     public struct Parameters {
@@ -61,8 +66,8 @@ public struct {{ endpoint.name }}: APIRequest {
         "{{ endpoint.path }}"
         {% endif %}
     }
-    {% if requiresAuth %}
-    public var requiresAuth: Bool { true }
+    {% if endpoint.requiresAuth %}
+    public static var requiresAuth: Bool { true }
     {% endif %}
     
     {% if endpoint.parameters.count > 0 %}
@@ -75,6 +80,8 @@ public struct {{ endpoint.name }}: APIRequest {
     
     {% if endpoint.bodyType != nil %}
     public var body: {{ endpoint.bodyType }}
+    {% else %}
+    public var body: Void = ()
     {% endif %}
     
     public init(

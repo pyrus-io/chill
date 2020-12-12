@@ -15,13 +15,16 @@ public protocol AnyAPIRequest {
 
 public protocol APIRequest: AnyAPIRequest {
 
-    associatedtype DecodedResponse
+    associatedtype BodyType
+    associatedtype ResponseType
     
     static var method: HTTPMethod { get }
+    static var requiresAuth: Bool { get }
     
     var endpoint: String { get }
-    var requiresAuth: Bool { get }
     var additionalHeaders: [String: String] { get }
+    
+    var body: BodyType { get }
     
     func getContentType() throws -> String?
     func getBody() throws -> Data?
@@ -33,18 +36,19 @@ public extension APIRequest {
         return "\(Self.method.rawValue.uppercased()) \(endpoint)"
     }
 
-    var requiresAuth: Bool { return false }
+    static var requiresAuth: Bool { false }
+    
     var additionalHeaders: [String: String] { [:] }
     
     func getContentType() -> String? { nil }
     func getBody() throws -> Data? { nil }
 }
 
-public extension APIRequest where Self: Encodable {
+public extension APIRequest where BodyType: Encodable {
     
     func getContentType() -> String? { "application/json" }
     
     func getBody() throws -> Data? {
-        try JSONEncoder().encode(self)
+        try JSONEncoder().encode(self.body)
     }
 }

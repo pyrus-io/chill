@@ -52,8 +52,12 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "open-api-generator"
+            argument = "api-docs"
             isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "api-client"
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "-i ~/Developer/pyrus.io/recycle-app-monorepo/api/Sources"
@@ -61,6 +65,10 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "-o test.json"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "-o ~/Developer/pyrus.io/recycle-app-monorepo/ios/generated"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument

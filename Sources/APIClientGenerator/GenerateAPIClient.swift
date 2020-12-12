@@ -11,7 +11,17 @@ public func generateAPIClient(inputPaths: [String], outputPath: String) throws {
     
     let doc = try DocumentationGenerator.generateOpenAPIDocument(
         readDirectoryUrls: inputDirectories,
-        config: .init()
+        config: .init(
+            securitySchemes: [
+                "BearerAuth": [
+                    "type": "http",
+                    "scheme": "bearer"
+                ]
+            ],
+            authForContext: { (contextName) -> String? in
+                ["AuthorizedRoutingContext"]
+                    .contains(where: { $0 == contextName}) ? "BearerAuth" : nil
+            })
     )
     
     try? FileManager.default.removeItem(atPath: Path("\(outputPath)/APIClient").absolute().url.path)

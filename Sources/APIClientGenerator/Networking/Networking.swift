@@ -47,7 +47,7 @@ public final class Networking {
     
     public func callAll<E: APIRequest>(
         _ requests: [E]
-    ) -> Promise<[E.DecodedResponse]> where E.DecodedResponse: Decodable {
+    ) -> Promise<[E.ResponseType]> where E.ResponseType: Decodable {
 
         guard let firstRequest = requests.first else {
             return Promise(error: NetworkingError(type: .emptyRequestArray))
@@ -61,10 +61,10 @@ public final class Networking {
     
     public func call<E: APIRequest>(
         _ request: E
-    ) -> Promise<E.DecodedResponse> where E.DecodedResponse: Decodable {
+    ) -> Promise<E.ResponseType> where E.ResponseType: Decodable {
         
         return confirmAuthValidIfNeededOrDie(request)
-            .then { _ -> Promise<E.DecodedResponse> in
+            .then { _ -> Promise<E.ResponseType> in
                 let urlRequest: URLRequest
                 do {
                     urlRequest = try self.buildUrlRequest(request)
@@ -73,7 +73,7 @@ public final class Networking {
                 }
                 
                 return Promise { (resolver) in
-                    let task = self.urlSession.dataTask(with: urlRequest, completionHandler: self.handleDecodableResponse(completion: { (result: Swift.Result<E.DecodedResponse, NetworkingError>) in
+                    let task = self.urlSession.dataTask(with: urlRequest, completionHandler: self.handleDecodableResponse(completion: { (result: Swift.Result<E.ResponseType, NetworkingError>) in
                         switch result {
                         case .success(let data):
                             resolver.fulfill(data)
@@ -124,7 +124,7 @@ extension Networking {
         urlRequest.httpMethod = E.method.rawValue
         urlRequest.allHTTPHeaderFields = [:]
         
-        if request.requiresAuth == true {
+        if E.requiresAuth {
             self.authModifier(&urlRequest)
         }
 
