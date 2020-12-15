@@ -110,6 +110,26 @@ public final class Networking {
         }
     }
     
+    public func upload<E: APIRequest & BinaryEncodable>(_ request: E) -> Promise<Void> {
+        let urlRequest: URLRequest
+        do {
+            urlRequest = try buildUrlRequest(request)
+        } catch {
+            return Promise(error: error)
+        }
+        return Promise { resolver in
+            let uploadTask = urlSession.uploadTask(with: urlRequest, fromFile: request.fileUrl, completionHandler: confirmNoErrorResponse { result in
+                switch result {
+                case .success(let data):
+                    resolver.fulfill(data)
+                case .failure(let e):
+                    resolver.reject(e)
+                }
+            })
+            uploadTask.resume()
+        }
+    }
+    
 }
 
 extension Networking {

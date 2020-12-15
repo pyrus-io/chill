@@ -72,7 +72,7 @@ public struct {{ endpoint.name }}: APIRequest {
                 {% endif %}
             {% endfor %}
             if queryValues.count > 0 {
-               finalPath = "?" + queryValues.joined(separator: "&")
+               finalPath += "?" + queryValues.joined(separator: "&")
             }
         return finalPath
         {% else %}

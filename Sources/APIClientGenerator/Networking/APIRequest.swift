@@ -54,3 +54,7 @@ public extension APIRequest where Body: Encodable {
         try JSONEncoder().encode(self.body)
     }
 }
+
+public protocol BinaryEncodable {
+    var fileUrl: URL { get }
+}
