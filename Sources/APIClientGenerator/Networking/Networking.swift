@@ -1,5 +1,5 @@
 import Foundation
-import PromiseKit
+import Combine
 
 public struct NetworkingError: Swift.Error {
     public enum `Type` {
@@ -23,14 +23,14 @@ public final class Networking {
     public private(set) var urlSession: URLSession
     
     public var baseURLStringProvider: (AnyAPIRequest) -> String
-    public var authRefresh: () -> Promise<Void>
+    public var authRefresh: () -> Future<Void, Error>
     public var authModifier: (inout URLRequest) -> Void
     public var badStatusCodeHandler: (Int) -> Void
     
     public init(
         urlSession: URLSession = .shared,
         baseURLStringProvider: @escaping (AnyAPIRequest) -> String,
-        authRefresh: @escaping () -> Promise<Void> = { .value(()) },
+        authRefresh: @escaping () -> Future<Void, Error> = { Future { $0(.success(())) } },
         authModifier: @escaping (inout URLRequest) -> Void = { _ in },
         badStatusCodeHandler: @escaping (Int) -> Void = { _ in }
     ) {
@@ -41,93 +41,103 @@ public final class Networking {
         self.badStatusCodeHandler = badStatusCodeHandler
     }
         
-    public func confirmAuthValidIfNeededOrDie<E: APIRequest>(_ request: E) -> Promise<Void> {
+    public func confirmAuthValidIfNeededOrDie<E: APIRequest>(_ request: E) -> AnyPublisher<Void, NetworkingError> {
         return authRefresh()
-    }
-    
-    public func callAll<E: APIRequest>(
-        _ requests: [E]
-    ) -> Promise<[E.ResponseBody]> where E.ResponseBody: Decodable {
-
-        guard let firstRequest = requests.first else {
-            return Promise(error: NetworkingError(type: .emptyRequestArray))
-        }
-
-        return confirmAuthValidIfNeededOrDie(firstRequest)
-            .then { _ in
-                when(fulfilled: requests.map(self.call))
-            }
+            .mapError { _ in NetworkingError(type: .unknown, statusCode: nil) }
+            .eraseToAnyPublisher()
     }
     
     public func call<E: APIRequest>(
         _ request: E
-    ) -> Promise<E.ResponseBody> where E.ResponseBody: Decodable {
+    ) -> AnyPublisher<E.ResponseBody, NetworkingError> where E.ResponseBody: Decodable {
         
         return confirmAuthValidIfNeededOrDie(request)
-            .then { _ -> Promise<E.ResponseBody> in
+            .flatMap { _ -> Future<E.ResponseBody, NetworkingError> in
                 let urlRequest: URLRequest
                 do {
                     urlRequest = try self.buildUrlRequest(request)
                 } catch {
-                    return Promise(error: error)
+                    return Future {
+                        $0(.failure(
+                            NetworkingError(
+                                type: .unknown,
+                                statusCode: nil
+                            )))
+                    }
                 }
                 
-                return Promise { (resolver) in
+                return Future { (resolver) in
                     let task = self.urlSession.dataTask(with: urlRequest, completionHandler: self.handleDecodableResponse(completion: { (result: Swift.Result<E.ResponseBody, NetworkingError>) in
                         switch result {
                         case .success(let data):
-                            resolver.fulfill(data)
+                            resolver(.success(data))
                         case .failure(let error):
-                            resolver.reject(error)
+                            resolver(.failure(error))
                         }
                     }))
                     task.resume()
                 }
-        }
-        
+            }
+            .eraseToAnyPublisher()
     }
     
     public func call<E: APIRequest>(
         _ request: E
-    ) -> Promise<Void> {
+    ) -> AnyPublisher<Void, NetworkingError> {
         let urlRequest: URLRequest
         do {
             urlRequest = try buildUrlRequest(request)
         } catch {
-            return Promise(error: error)
+            return Future {
+                $0(.failure(
+                    NetworkingError(
+                        type: .unknown,
+                        statusCode: nil
+                    )))
+            }
+            .eraseToAnyPublisher()
         }
         
-        return Promise { (resolver) in
-            let task = self.urlSession.dataTask(with: urlRequest, completionHandler: confirmNoErrorResponse(completion: { (result) in
+        return Future { (resolver) in
+            let task = self.urlSession.dataTask(with: urlRequest, completionHandler: self.confirmNoErrorResponse(completion: { (result) in
                 switch result {
                 case .success(let data):
-                    resolver.fulfill(data)
+                    resolver(.success(data))
                 case .failure(let error):
-                    resolver.reject(error)
+                    resolver(.failure(error))
                 }
             }))
             task.resume()
         }
+        .eraseToAnyPublisher()
     }
     
-    public func upload<E: APIRequest & BinaryEncodable>(_ request: E) -> Promise<Void> {
+    public func upload<E: APIRequest & BinaryEncodable>(_ request: E) -> AnyPublisher<Void, NetworkingError> {
         let urlRequest: URLRequest
         do {
             urlRequest = try buildUrlRequest(request)
         } catch {
-            return Promise(error: error)
+            return Future {
+                $0(.failure(
+                    NetworkingError(
+                        type: .unknown,
+                        statusCode: nil
+                    )))
+            }
+            .eraseToAnyPublisher()
         }
-        return Promise { resolver in
-            let uploadTask = urlSession.uploadTask(with: urlRequest, fromFile: request.fileUrl, completionHandler: confirmNoErrorResponse { result in
+        return Future { resolver in
+            let uploadTask = self.urlSession.uploadTask(with: urlRequest, fromFile: request.fileUrl, completionHandler: self.confirmNoErrorResponse { result in
                 switch result {
                 case .success(let data):
-                    resolver.fulfill(data)
+                    resolver(.success(data))
                 case .failure(let e):
-                    resolver.reject(e)
+                    resolver(.failure(e))
                 }
             })
             uploadTask.resume()
         }
+        .eraseToAnyPublisher()
     }
     
 }

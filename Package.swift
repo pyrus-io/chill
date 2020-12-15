@@ -18,7 +18,6 @@ let package = Package(
         .package(url: "https://github.com/jpsim/SourceKitten.git", from: "0.3.0"),
         
         .package(url: "https://github.com/stencilproject/Stencil.git", from: "0.14.0"),
-        .package(url: "https://github.com/mxcl/PromiseKit.git", from: "6.13.2"),
         .package(url: "https://github.com/nicklockwood/SwiftFormat.git", from: "0.47.7"),
         
         .package(url: "https://github.com/apple/swift-argument-parser", from: "0.3.1"),
@@ -50,7 +49,6 @@ let package = Package(
             name: "APIClientGenerator",
             dependencies: [
                 .product(name: "Stencil", package: "Stencil"),
-                .product(name: "PromiseKit", package: "PromiseKit"),
                 .product(name: "SwiftFormat", package: "SwiftFormat"),
 
                 .target(name: "SwaggerDocumentationGenerator"),
