@@ -1,10 +1,3 @@
-//
-//  main.swift
-//  
-//
-//  Created by Kyle Newsome on 2020-10-26.
-//
-
 import Foundation
 import SourceKittenFramework
 import SwiftTypesExtractor
@@ -404,31 +397,41 @@ public struct DocumentationGenerator {
         type.instanceProperties.values
             .sorted(by: { $0.order < $1.order })
             .forEach { (property) in
+                
+            let nonOptionalName = property.type.trimmingCharacters(in: .init(arrayLiteral: "?"))
             
             if typeIsNonPrimitive(property.type) {
                 if typeIsArray(property.type),
-                   let typeName = extractType(from: property.type, regex: Constants.arrayRegex),
-                   let returnType = extractor.types[typeName] {
+                   let typeName = extractType(from: property.type, regex: Constants.arrayRegex) {
+                    if typeIsNonPrimitive(typeName),
+                       let returnType = extractor.types[typeName] {
                         createDefinition(
                             from: returnType,
                             insertingInto: &definitionsTable,
                             withName: typeName,
                             extractor: extractor
                         )
-                    properties[property.name] = .init(
-                        items: Swagger.ItemReference(
-                        ref: "#/components/schemas/\(typeName)"
-                    ))
+                        properties[property.name] = .init(
+                            items: Swagger.ItemReference(
+                            ref: "#/components/schemas/\(typeName)"
+                        ))
+                    } else {
+                        properties[property.name] = .init(
+                            items: Swagger.ItemReference(
+                                type: Swagger.ReferenceType(rawValue: cleanType(typeName)) ?? .object,
+                                format: cleanFormat(typeName)
+                        ))
+                    }
                 }
-                else if let typeDescription = extractor.types[property.type] {
+                else if let typeDescription = extractor.types[nonOptionalName] {
                     createDefinition(
                         from: typeDescription,
                         insertingInto: &definitionsTable,
-                        withName: property.type,
+                        withName: nonOptionalName,
                         extractor: extractor
                     )
                     properties[property.name] = .init(
-                        ref: "#/components/schemas/\(property.type)"
+                        ref: "#/components/schemas/\(nonOptionalName)"
                     )
                 }
             } else {

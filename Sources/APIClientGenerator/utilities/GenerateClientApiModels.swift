@@ -127,8 +127,18 @@ func model(schemaName: String, definition: Swagger.Definition) -> Model? {
                 type: typeName,
                 required: required
             ))
-        } else if let itemsRef = prop.items?.ref {
-            var typeName = itemsRef.replacingOccurrences(of: Constants.componentsSchemasPrefix, with: "")
+        }
+        else if let items = prop.items {
+            var typeName: String
+            if let itemsRef = items.ref {
+                typeName = itemsRef.replacingOccurrences(of: Constants.componentsSchemasPrefix, with: "")
+            }
+            else if let type = items.type {
+                typeName = openApiTypeToSwiftType(type.rawValue, format: items.format)
+            } else {
+                continue
+            }
+            
             typeName = "[" + typeName + "]"
             let required = definition.required?.contains(key) == true
             if !required {
@@ -139,7 +149,8 @@ func model(schemaName: String, definition: Swagger.Definition) -> Model? {
                 type: typeName,
                 required: required
             ))
-        } else if let ref = prop.ref {
+        }
+        else if let ref = prop.ref {
             var typeName = ref.replacingOccurrences(of: Constants.componentsSchemasPrefix, with: "")
             let required = definition.required?.contains(key) == true
             if !required {
