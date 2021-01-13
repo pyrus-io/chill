@@ -1,8 +1,8 @@
 import Foundation
 import Combine
 
-public struct NetworkingError: Swift.Error {
-    public enum `Type` {
+public struct NetworkingError: Swift.Error, Equatable {
+    public enum `Type`: Equatable {
         case badUrl
         case emptyRequestArray
         case failedEncodeRequest
@@ -10,7 +10,7 @@ public struct NetworkingError: Swift.Error {
         case noData
         case failedDecodeResponse
         case unsuccessfulStatusCode
-        case urlSessionError(Error)
+        case urlSessionError(String)
         case unknown
     }
     
@@ -26,6 +26,8 @@ public final class Networking {
     public var authRefresh: () -> Future<Void, Error>
     public var authModifier: (inout URLRequest) -> Void
     public var badStatusCodeHandler: (Int) -> Void
+    
+    public var debug: Bool = false
     
     public init(
         urlSession: URLSession = .shared,
@@ -50,33 +52,38 @@ public final class Networking {
     public func call<E: APIRequest>(
         _ request: E
     ) -> AnyPublisher<E.ResponseBody, NetworkingError> where E.ResponseBody: Decodable {
-        
         return confirmAuthValidIfNeededOrDie(request)
-            .flatMap { _ -> Future<E.ResponseBody, NetworkingError> in
+            .flatMap { _ -> AnyPublisher<E.ResponseBody, NetworkingError> in
                 let urlRequest: URLRequest
                 do {
                     urlRequest = try self.buildUrlRequest(request)
                 } catch {
-                    return Future {
-                        $0(.failure(
-                            NetworkingError(
-                                type: .unknown,
-                                statusCode: nil
-                            )))
+                    return Deferred {
+                        Future {
+                            $0(.failure(
+                                NetworkingError(
+                                    type: .unknown,
+                                    statusCode: nil
+                                )))
+                        }
                     }
+                    .eraseToAnyPublisher()
                 }
                 
-                return Future { (resolver) in
-                    let task = self.urlSession.dataTask(with: urlRequest, completionHandler: self.handleDecodableResponse(completion: { (result: Swift.Result<E.ResponseBody, NetworkingError>) in
-                        switch result {
-                        case .success(let data):
-                            resolver(.success(data))
-                        case .failure(let error):
-                            resolver(.failure(error))
-                        }
-                    }))
-                    task.resume()
+                return Deferred {
+                    Future { (resolver) in
+                        let task = self.urlSession.dataTask(with: urlRequest, completionHandler: self.handleDecodableResponse(completion: { (result: Swift.Result<E.ResponseBody, NetworkingError>) in
+                            switch result {
+                            case .success(let data):
+                                resolver(.success(data))
+                            case .failure(let error):
+                                resolver(.failure(error))
+                            }
+                        }))
+                        task.resume()
+                    }
                 }
+                .eraseToAnyPublisher()
             }
             .eraseToAnyPublisher()
     }
@@ -88,26 +95,30 @@ public final class Networking {
         do {
             urlRequest = try buildUrlRequest(request)
         } catch {
-            return Future {
-                $0(.failure(
-                    NetworkingError(
-                        type: .unknown,
-                        statusCode: nil
-                    )))
+            return Deferred {
+                Future {
+                    $0(.failure(
+                        NetworkingError(
+                            type: .unknown,
+                            statusCode: nil
+                        )))
+                }
             }
             .eraseToAnyPublisher()
         }
         
-        return Future { (resolver) in
-            let task = self.urlSession.dataTask(with: urlRequest, completionHandler: self.confirmNoErrorResponse(completion: { (result) in
-                switch result {
-                case .success(let data):
-                    resolver(.success(data))
-                case .failure(let error):
-                    resolver(.failure(error))
-                }
-            }))
-            task.resume()
+        return Deferred {
+            Future { (resolver) in
+                let task = self.urlSession.dataTask(with: urlRequest, completionHandler: self.confirmNoErrorResponse(completion: { (result) in
+                    switch result {
+                    case .success(let data):
+                        resolver(.success(data))
+                    case .failure(let error):
+                        resolver(.failure(error))
+                    }
+                }))
+                task.resume()
+            }
         }
         .eraseToAnyPublisher()
     }
@@ -117,25 +128,29 @@ public final class Networking {
         do {
             urlRequest = try buildUrlRequest(request)
         } catch {
-            return Future {
-                $0(.failure(
-                    NetworkingError(
-                        type: .unknown,
-                        statusCode: nil
-                    )))
+            return Deferred {
+                Future {
+                    $0(.failure(
+                        NetworkingError(
+                            type: .unknown,
+                            statusCode: nil
+                        )))
+                }
             }
             .eraseToAnyPublisher()
         }
-        return Future { resolver in
-            let uploadTask = self.urlSession.uploadTask(with: urlRequest, fromFile: request.fileUrl, completionHandler: self.confirmNoErrorResponse { result in
-                switch result {
-                case .success(let data):
-                    resolver(.success(data))
-                case .failure(let e):
-                    resolver(.failure(e))
-                }
-            })
-            uploadTask.resume()
+        return Deferred {
+            Future { resolver in
+                let uploadTask = self.urlSession.uploadTask(with: urlRequest, fromFile: request.fileUrl, completionHandler: self.confirmNoErrorResponse { result in
+                    switch result {
+                    case .success(let data):
+                        resolver(.success(data))
+                    case .failure(let e):
+                        resolver(.failure(e))
+                    }
+                })
+                uploadTask.resume()
+            }
         }
         .eraseToAnyPublisher()
     }
@@ -151,7 +166,7 @@ extension Networking {
         }
         
         var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = E.method.rawValue
+        urlRequest.httpMethod = E.method.rawValue.uppercased()
         urlRequest.allHTTPHeaderFields = [:]
         
         if E.requiresAuth {
@@ -167,6 +182,10 @@ extension Networking {
         } catch {
             throw NetworkingError(type: .failedEncodeRequest)
         }
+        
+        if debug {
+            print(urlRequest.curlString)
+        }
 
         return urlRequest
     }
@@ -174,7 +193,7 @@ extension Networking {
     private func handleDecodableResponse<T: Decodable>(completion: @escaping (Swift.Result<T, NetworkingError>) -> Void) -> (Data?, URLResponse?, Error?) -> Void {
         return { data, response, error in
             if let e = error {
-                completion(.failure(.init(type: .urlSessionError(e))))
+                completion(.failure(.init(type: .urlSessionError(e.localizedDescription))))
             }
             guard let response = response as? HTTPURLResponse else {
                 completion(.failure(.init(type: (.emptyHttpResponse))))
@@ -207,7 +226,7 @@ extension Networking {
     private func confirmNoErrorResponse(completion: @escaping (Swift.Result<Void, NetworkingError>) -> Void) -> (Data?, URLResponse?, Error?) -> Void {
         return { data, response, error in
             if let e = error {
-                completion(.failure(.init(type: .urlSessionError(e))))
+                completion(.failure(.init(type: .urlSessionError(e.localizedDescription))))
             }
             guard let response = response as? HTTPURLResponse else {
                 completion(.failure(.init(type: .emptyHttpResponse)))
@@ -235,4 +254,38 @@ extension Networking {
         return body
     }
 
+}
+
+extension URLRequest {
+    
+    /**
+     Returns a cURL command representation of this URL request.
+     */
+    public var curlString: String {
+        guard let url = url else { return "" }
+        var baseCommand = "curl \(url.absoluteString)"
+        
+        if httpMethod == "HEAD" {
+            baseCommand += " --head"
+        }
+        
+        var command = [baseCommand]
+        
+        if let method = httpMethod, method != "GET" && method != "HEAD" {
+            command.append("-X \(method)")
+        }
+        
+        if let headers = allHTTPHeaderFields {
+            for (key, value) in headers where key != "Cookie" {
+                command.append("-H '\(key): \(value)'")
+            }
+        }
+        
+        // print small bodies, only 100kb or less
+        if let data = httpBody, data.count < 100_000, let body = String(data: data, encoding: .utf8) {
+            command.append("-d '\(body)'")
+        }
+        
+        return command.joined(separator: " \\\n\t")
+    }
 }

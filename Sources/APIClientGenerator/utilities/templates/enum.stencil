@@ -4,7 +4,7 @@
 //
 import Foundation
 
-public enum {{ enum.name }}: String, Codable {
+public enum {{ enum.name }}: String, Codable, Equatable, Hashable, CaseIterable {
   {% for case in enum.cases %}
     case {{ case }}
   {% endfor %}

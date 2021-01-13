@@ -4,7 +4,7 @@
 //
 import Foundation
 
-public struct {{ model.name }}: Codable, Equatable {
+public struct {{ model.name }}: Codable, Equatable, Hashable {
   {% for prop in model.properties %}
     public var {{ prop.name }}: {{ prop.type }}
   {% endfor %}
